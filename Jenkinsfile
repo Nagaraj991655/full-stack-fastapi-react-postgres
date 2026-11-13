@@ -19,13 +19,15 @@ pipeline {
                 // Bring down current compose project if running
                 sh 'docker compose down --remove-orphans || true'
                 
-                // Automatically find and force-remove any leftover container holding port 5432
+                // Automatically find and force-remove any leftover containers holding ports 5432, 8000, or 80
                 sh '''
-                    CONFLICTING_CONTAINER=$(docker ps -q --filter publish=5432)
-                    if [ ! -z "$CONFLICTING_CONTAINER" ]; then
-                        echo "Port 5432 is occupied by container(s): $CONFLICTING_CONTAINER. Forcibly removing..."
-                        docker rm -f $CONFLICTING_CONTAINER
-                    fi
+                    for port in 5432 8000 80; do
+                        CONFLICTING_CONTAINER=$(docker ps -q --filter publish=$port)
+                        if [ ! -z "$CONFLICTING_CONTAINER" ]; then
+                            echo "Port $port is occupied by container(s): $CONFLICTING_CONTAINER. Forcibly removing..."
+                            docker rm -f $CONFLICTING_CONTAINER
+                        fi
+                    done
                 '''
             }
         }
