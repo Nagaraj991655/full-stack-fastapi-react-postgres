@@ -2,43 +2,48 @@ pipeline {
     agent any
 
     environment {
-        // Define your Compose project name so Docker manages networks/volumes correctly
         COMPOSE_PROJECT_NAME = 'fullstack-app'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                // Pulls code from your GitHub repo using the SSH credentials configured in Jenkins
                 git branch: 'main', 
-                    credentialsId: 'ssh-github', 
+                    credentialsId: 'github-ssh-key', 
                     url: 'https://github.com/Nagaraj991655/full-stack-fastapi-react-postgres.git'
             }
         }
         
-        stage('Stop Existing Containers') {
+        stage('Automatic Cleanup & Port Release') {
             steps {
-                sh 'docker compose down --remove-orphans'
+                // Bring down current compose project if running
+                sh 'docker compose down --remove-orphans || true'
+                
+                // Automatically find and force-remove any leftover container holding port 5432
+                sh '''
+                    CONFLICTING_CONTAINER=$(docker ps -q --filter publish=5432)
+                    if [ ! -z "$CONFLICTING_CONTAINER" ]; then
+                        echo "Port 5432 is occupied by container(s): $CONFLICTING_CONTAINER. Forcibly removing..."
+                        docker rm -f $CONFLICTING_CONTAINER
+                    fi
+                '''
             }
         }
 
         stage('Build Docker Images') {
             steps {
-                // Build images cleanly with no-cache to pick up latest code changes
                 sh 'docker compose build --no-cache'
             }
         }
 
         stage('Deploy Stack') {
             steps {
-                // Spin up containers in detached mode
                 sh 'docker compose up -d'
             }
         }
         
         stage('Health Check') {
             steps {
-                // Quick sleep to let services initialize, then verify container statuses
                 sleep time: 5, unit: 'SECONDS'
                 sh 'docker ps'
             }
